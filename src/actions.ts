@@ -1,6 +1,6 @@
-import { mapTitle, sanitizeMap, toMarkdown } from './model/tree'
-import type { MindMap } from './model/types'
-import { deleteMap, getState, importMap, selectActiveMap, showToast } from './store'
+import { docToMarkdown, mapTitle, sanitizeDoc } from './model/doc'
+import type { AnyMap } from './model/types'
+import { deleteMap, getState, importMap, selectActiveDoc, showToast } from './store'
 
 const FILE_FORMAT = 'nodara-map'
 
@@ -34,7 +34,7 @@ function pickTextFile(): Promise<{ name: string; content: string } | null> {
 }
 
 export async function saveMapToFile(): Promise<void> {
-  const map = selectActiveMap(getState())
+  const map = selectActiveDoc(getState())
   if (!map) return
   const content = JSON.stringify({ format: FILE_FORMAT, version: 1, map }, null, 2)
   try {
@@ -45,10 +45,10 @@ export async function saveMapToFile(): Promise<void> {
 }
 
 export async function exportMarkdown(): Promise<void> {
-  const map = selectActiveMap(getState())
+  const map = selectActiveDoc(getState())
   if (!map) return
   try {
-    if (await saveText(`${safeName(mapTitle(map))}.md`, toMarkdown(map), 'Markdown', ['md'])) {
+    if (await saveText(`${safeName(mapTitle(map))}.md`, docToMarkdown(map), 'Markdown', ['md'])) {
       showToast('Markdown exported')
     }
   } catch {
@@ -62,7 +62,7 @@ export async function openMapFromFile(): Promise<void> {
     if (!file) return
     const parsed: unknown = JSON.parse(file.content)
     const raw = typeof parsed === 'object' && parsed !== null && 'map' in parsed ? (parsed as { map: unknown }).map : parsed
-    const map: MindMap | null = sanitizeMap(raw)
+    const map: AnyMap | null = sanitizeDoc(raw)
     if (!map) throw new Error('not a map')
     importMap(map)
     showToast('Map opened')
@@ -71,6 +71,6 @@ export async function openMapFromFile(): Promise<void> {
   }
 }
 
-export function confirmDeleteMap(map: MindMap): void {
+export function confirmDeleteMap(map: AnyMap): void {
   if (window.confirm(`Delete "${mapTitle(map)}"? This can't be undone.`)) deleteMap(map.id)
 }

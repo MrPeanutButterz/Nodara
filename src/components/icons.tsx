@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { MapKind } from '../model/types'
 
 function Icon({ children, size = 16 }: { children: ReactNode; size?: number }) {
   return (
@@ -84,3 +85,55 @@ export const MapIcon = () => (
     <path d="m5.5 7.4 5-2.8M5.5 8.6l5 2.8" />
   </Icon>
 )
+
+export const ChevronDownIcon = () => (
+  <Icon size={14}>
+    <path d="m4 6 4 4 4-4" />
+  </Icon>
+)
+
+export const CheckIcon = () => (
+  <Icon>
+    <path d="m3.5 8.5 3 3 6-7" />
+  </Icon>
+)
+
+export const ConceptIcon = () => (
+  <Icon>
+    <circle cx="4.5" cy="4.5" r="2" />
+    <circle cx="11.5" cy="11.5" r="2" />
+    <path d="m6 6 4 4" />
+    <path d="M10 4.5h3.5M2.5 11.5H6" />
+  </Icon>
+)
+
+export const FlowchartIcon = () => (
+  <Icon>
+    <rect x="5.2" y="1.8" width="5.6" height="3.4" rx="1.2" />
+    <path d="M8 5.2v2" />
+    <path d="M8 7.2 11.2 10 8 12.8 4.8 10z" />
+  </Icon>
+)
+
+export const TimelineIcon = () => (
+  <Icon>
+    <path d="M1.8 8h12.4" />
+    <path d="M4.5 8V4M8.5 8v4M12 8V5" />
+    <circle cx="4.5" cy="3.2" r="0.9" />
+    <circle cx="8.5" cy="12.8" r="0.9" />
+  </Icon>
+)
+
+/** The icon that goes with a kind of map. */
+export function KindIcon({ kind }: { kind: MapKind }) {
+  switch (kind) {
+    case 'concept':
+      return <ConceptIcon />
+    case 'flowchart':
+      return <FlowchartIcon />
+    case 'timeline':
+      return <TimelineIcon />
+    default:
+      return <MapIcon />
+  }
+}

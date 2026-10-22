@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { confirmDeleteMap, exportMarkdown, openMapFromFile, saveMapToFile } from '../actions'
-import { mapTitle } from '../model/tree'
+import { KIND_LABEL, LAYOUT_LABEL, kindOf, mapTitle } from '../model/doc'
+import { TREE_LAYOUTS } from '../model/tree'
+import type { MapKind } from '../model/types'
 import { MOD, SHIFT } from '../platform'
 import {
   addChildToSelected,
@@ -9,16 +11,22 @@ import {
   getState,
   newMap,
   openMap,
+  cycleSelectedShape,
   redo,
   requestFit,
-  selectActiveMap,
+  reverseSelectedLink,
+  selectActiveDoc,
   setPalette,
+  setTreeLayout,
   startEdit,
+  startEditLink,
+  startRenameMap,
+  toggleSelectedLinkArrow,
   toggleCollapse,
   toggleSidebar,
   undo,
 } from '../store'
-import { MapIcon } from './icons'
+import { KindIcon } from './icons'
 import { Kbd } from './Kbd'
 
 interface Command {
@@ -26,27 +34,55 @@ interface Command {
   title: string
   group: 'Actions' | 'Maps'
   keys?: string[]
+  kind?: MapKind
   run: () => void
 }
+
+const NEW_KINDS: MapKind[] = ['mindmap', 'concept', 'flowchart', 'timeline']
 
 /** Built once when the palette opens, so it only lists what makes sense for the current selection. */
 function buildCommands(): Command[] {
   const state = getState()
-  const map = selectActiveMap(state)
-  const selected = map && state.selectedId ? map.nodes[state.selectedId] : undefined
-  const commands: Command[] = [{ id: 'new-map', title: 'New map', group: 'Actions', keys: [MOD, 'N'], run: newMap }]
+  const doc = selectActiveDoc(state)
+  const commands: Command[] = NEW_KINDS.map((kind) => ({
+    id: `new-${kind}`,
+    title: `New ${KIND_LABEL[kind].toLowerCase()}`,
+    group: 'Actions' as const,
+    keys: kind === 'mindmap' ? [MOD, 'N'] : undefined,
+    run: () => newMap(kind),
+  }))
 
-  if (map) {
+  if (doc) {
+    const isGraph = doc.kind === 'graph'
+    const selected = state.selectedId ? doc.nodes[state.selectedId] : undefined
     commands.push(
-      { id: 'add-child', title: 'Add child idea', group: 'Actions', keys: ['Tab'], run: addChildToSelected },
-      { id: 'add-sibling', title: 'Add sibling idea', group: 'Actions', keys: ['Enter'], run: addSiblingToSelected },
+      { id: 'rename-map', title: 'Rename map', group: 'Actions', run: startRenameMap },
+      {
+        id: 'add-child',
+        title: isGraph ? 'Add connected idea' : doc.layout === 'timeline' ? 'Add detail' : 'Add child idea',
+        group: 'Actions',
+        keys: ['Tab'],
+        run: addChildToSelected,
+      },
+      {
+        id: 'add-sibling',
+        title: isGraph ? 'Add idea below' : doc.layout === 'timeline' ? 'Add event' : 'Add sibling idea',
+        group: 'Actions',
+        keys: ['Enter'],
+        run: addSiblingToSelected,
+      },
     )
+    if (doc.kind === 'tree') {
+      for (const layout of TREE_LAYOUTS) {
+        if (layout === doc.layout) continue
+        commands.push({ id: `layout-${layout}`, title: `Layout: ${LAYOUT_LABEL[layout]}`, group: 'Actions', run: () => setTreeLayout(layout) })
+      }
+    }
     if (selected) {
       commands.push({ id: 'rename', title: 'Rename idea', group: 'Actions', keys: ['Space'], run: () => startEdit() })
-      if (selected.id !== map.rootId) {
-        commands.push({ id: 'delete-idea', title: 'Delete idea', group: 'Actions', keys: ['Del'], run: deleteSelected })
-      }
-      if (selected.children.length > 0) {
+      const isRoot = doc.kind === 'tree' && selected.id === doc.rootId
+      if (!isRoot) commands.push({ id: 'delete-idea', title: 'Delete idea', group: 'Actions', keys: ['Del'], run: deleteSelected })
+      if ('children' in selected && selected.children.length > 0) {
         commands.push({
           id: 'collapse',
           title: selected.collapsed ? 'Expand branch' : 'Collapse branch',
@@ -55,6 +91,17 @@ function buildCommands(): Command[] {
           run: () => toggleCollapse(),
         })
       }
+      if (doc.kind === 'graph' && doc.variant === 'flowchart') {
+        commands.push({ id: 'shape', title: 'Change shape', group: 'Actions', keys: ['S'], run: cycleSelectedShape })
+      }
+    }
+    if (doc.kind === 'graph' && state.selectedLinkId) {
+      commands.push(
+        { id: 'link-label', title: 'Edit link label', group: 'Actions', keys: ['Space'], run: () => startEditLink(state.selectedLinkId as string) },
+        { id: 'link-arrow', title: 'Toggle link arrow', group: 'Actions', run: toggleSelectedLinkArrow },
+        { id: 'link-reverse', title: 'Reverse link direction', group: 'Actions', run: reverseSelectedLink },
+        { id: 'delete-link', title: 'Delete link', group: 'Actions', keys: ['Del'], run: deleteSelected },
+      )
     }
   }
   if (state.history.past.length > 0) commands.push({ id: 'undo', title: 'Undo', group: 'Actions', keys: [MOD, 'Z'], run: undo })
@@ -66,20 +113,15 @@ function buildCommands(): Command[] {
     { id: 'sidebar', title: state.sidebarOpen ? 'Hide sidebar' : 'Show sidebar', group: 'Actions', keys: [MOD, '\\'], run: toggleSidebar },
     { id: 'open-file', title: 'Open map from file', group: 'Actions', run: () => void openMapFromFile() },
   )
-  if (map) {
+  if (doc) {
     commands.push(
       { id: 'save-file', title: 'Save map to file', group: 'Actions', run: () => void saveMapToFile() },
       { id: 'export-md', title: 'Export map as Markdown', group: 'Actions', run: () => void exportMarkdown() },
-      { id: 'delete-map', title: 'Delete map', group: 'Actions', run: () => confirmDeleteMap(map) },
+      { id: 'delete-map', title: 'Delete map', group: 'Actions', run: () => confirmDeleteMap(doc) },
     )
   }
   for (const m of state.workspace.maps) {
-    commands.push({
-      id: `map-${m.id}`,
-      title: mapTitle(m),
-      group: 'Maps',
-      run: () => openMap(m.id),
-    })
+    commands.push({ id: `map-${m.id}`, title: mapTitle(m), group: 'Maps', kind: kindOf(m), run: () => openMap(m.id) })
   }
   return commands
 }
@@ -171,7 +213,7 @@ export function CommandPalette() {
                   onPointerMove={() => setIndex(i)}
                   onClick={() => run(command)}
                 >
-                  {command.group === 'Maps' && <MapIcon />}
+                  {command.group === 'Maps' && <KindIcon kind={command.kind ?? 'mindmap'} />}
                   <span className="palette-title">{command.title}</span>
                   {command.keys && <Kbd keys={command.keys} />}
                 </div>

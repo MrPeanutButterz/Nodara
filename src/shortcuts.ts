@@ -1,14 +1,18 @@
 import { useEffect } from 'react'
+import type { Direction } from './model/types'
 import {
   addChildToSelected,
   addSiblingToSelected,
+  cycleSelectedShape,
   deleteSelected,
   getState,
   moveSelection,
   newMap,
+  nudgeSelected,
   redo,
   reorderSelected,
   requestFit,
+  selectActiveDoc,
   selectNode,
   setPalette,
   startEdit,
@@ -33,6 +37,8 @@ export function useGlobalShortcuts(): void {
       if (state.paletteOpen) return
 
       const target = e.target as HTMLElement | null
+      // An open menu owns the arrow keys, Enter and Tab while it has focus.
+      if (target?.closest('[role="menu"]')) return
       const typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
 
       if (mod) {
@@ -57,6 +63,18 @@ export function useGlobalShortcuts(): void {
         return
       }
       if (typing) return
+
+      const doc = selectActiveDoc(state)
+      const isGraph = doc?.kind === 'graph'
+      // Alt+arrow moves an idea in a graph, and reorders siblings in a tree (along the axis they run on).
+      const altMove = (direction: Direction): void => {
+        if (isGraph) nudgeSelected(direction)
+        else if (doc?.kind === 'tree' && doc.layout === 'down') {
+          if (direction === 'left') reorderSelected(-1)
+          else if (direction === 'right') reorderSelected(1)
+        } else if (direction === 'up') reorderSelected(-1)
+        else if (direction === 'down') reorderSelected(1)
+      }
 
       // Enter and Space on a focused button should still press it.
       const onButton = !!target?.closest('button')
@@ -87,28 +105,22 @@ export function useGlobalShortcuts(): void {
           deleteSelected()
           break
         case 'ArrowLeft':
-          e.preventDefault()
-          moveSelection('left')
-          break
         case 'ArrowRight':
-          e.preventDefault()
-          moveSelection('right')
-          break
         case 'ArrowUp':
+        case 'ArrowDown': {
           e.preventDefault()
-          if (e.altKey) reorderSelected(-1)
-          else moveSelection('up')
+          const direction = e.key.slice(5).toLowerCase() as Direction
+          if (e.altKey) altMove(direction)
+          else moveSelection(direction)
           break
-        case 'ArrowDown':
-          e.preventDefault()
-          if (e.altKey) reorderSelected(1)
-          else moveSelection('down')
-          break
+        }
         case 'Escape':
           selectNode(null)
           break
         default:
-          if (key === 'c' && !e.altKey && !e.shiftKey) toggleCollapse()
+          if (e.altKey || e.shiftKey) break
+          if (key === 'c') toggleCollapse()
+          else if (key === 's') cycleSelectedShape()
       }
     }
 

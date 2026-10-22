@@ -671,3 +671,275 @@ kbd {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- Menus ---------- */
+
+.menu-wrap {
+  position: relative;
+}
+.sidebar .menu-wrap {
+  display: block;
+}
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 240px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.topbar .menu {
+  left: auto;
+  right: 0;
+}
+.menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  text-align: left;
+}
+.menu-item:hover,
+.menu-item:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+  outline: 0;
+}
+.menu-icon {
+  display: grid;
+  color: var(--text-3);
+}
+.menu-text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.menu-label {
+  color: var(--text);
+  font-weight: 510;
+}
+.menu-desc {
+  color: var(--text-4);
+  font-size: 12px;
+}
+.menu-check {
+  display: grid;
+  color: var(--accent-bright);
+}
+
+.layout-btn {
+  height: 28px;
+  padding: 0 6px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  transition: background 0.12s, border-color 0.12s;
+}
+.layout-btn:hover,
+.layout-btn[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-strong);
+}
+
+.kind-chip {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-3);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.title-input {
+  min-width: 0;
+  width: 240px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--accent-bright);
+  border-radius: 5px;
+  outline: 0;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 510;
+  user-select: text;
+}
+
+/* ---------- Tree layouts ---------- */
+
+/* Handles sit on the side where children grow. */
+.add-child.side-left,
+.collapse-badge.side-left {
+  right: auto;
+  left: -34px;
+}
+.add-child.side-top,
+.collapse-badge.side-top,
+.add-child.side-bottom,
+.collapse-badge.side-bottom {
+  right: auto;
+  left: 50%;
+  top: auto;
+  transform: translateX(-50%);
+}
+.add-child.side-top,
+.collapse-badge.side-top {
+  bottom: auto;
+  top: -32px;
+}
+.add-child.side-bottom,
+.collapse-badge.side-bottom {
+  bottom: -32px;
+}
+
+/* Siblings that run left to right: the drop marker is a vertical bar. */
+.axis-x .node.drop-before::before,
+.axis-x .node.drop-after::after {
+  top: 0;
+  bottom: 0;
+  left: auto;
+  right: auto;
+  width: 2px;
+  height: auto;
+}
+.axis-x .node.drop-before::before {
+  left: -7px;
+}
+.axis-x .node.drop-after::after {
+  right: -7px;
+}
+
+.edge.axis {
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 2;
+}
+
+/* ---------- Concept maps and flowcharts ---------- */
+
+.edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 16;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.edge.preview {
+  stroke: var(--accent-bright);
+  stroke-dasharray: 5 4;
+  transition: none;
+}
+
+.graph .node {
+  justify-content: center;
+  text-align: center;
+}
+.graph .node.moving {
+  transition: none;
+  z-index: 2;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.graph .node.link-target {
+  border-color: var(--accent-bright);
+  background: var(--accent-soft);
+}
+
+.node.shape-terminal {
+  border-radius: 999px;
+}
+
+.node.shape-decision {
+  padding: 0 28px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.node.shape-decision:hover {
+  background: transparent;
+}
+.shape-bg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.shape-bg polygon {
+  fill: var(--surface);
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  transition: fill 0.12s, stroke 0.12s;
+}
+.node.shape-decision:hover .shape-bg polygon {
+  fill: var(--surface-hover);
+  stroke: rgba(255, 255, 255, 0.2);
+}
+.node.shape-decision.selected .shape-bg polygon {
+  stroke: var(--accent-bright);
+  filter: drop-shadow(0 0 4px var(--accent-soft));
+}
+.node.shape-decision.link-target .shape-bg polygon {
+  fill: var(--accent-soft);
+  stroke: var(--accent-bright);
+}
+.node.shape-decision .node-text,
+.node.shape-decision .node-input {
+  position: relative;
+  text-align: center;
+}
+
+.link-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  max-width: 220px;
+  padding: 2px 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.link-label:hover {
+  color: var(--text-2);
+  border-color: var(--border-strong);
+}
+.link-label.selected {
+  border-color: var(--accent-bright);
+  color: var(--text);
+}
+.link-label.empty {
+  color: var(--text-4);
+  border-style: dashed;
+}
+.link-input {
+  min-width: 7ch;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  caret-color: var(--accent-bright);
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  user-select: text;
+}

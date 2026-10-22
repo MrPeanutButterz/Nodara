@@ -1,5 +1,5 @@
-import { sanitizeMap } from './model/tree'
-import type { MindMap, Workspace } from './model/types'
+import { sanitizeDoc } from './model/doc'
+import type { AnyMap, Workspace } from './model/types'
 
 const KEY = 'nodara.workspace.v1'
 
@@ -8,7 +8,7 @@ export function loadWorkspace(): Workspace {
     const parsed: unknown = JSON.parse(localStorage.getItem(KEY) ?? 'null')
     if (typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { maps?: unknown }).maps)) {
       const stored = parsed as { maps: unknown[]; activeMapId?: unknown }
-      const maps = stored.maps.map(sanitizeMap).filter((map): map is MindMap => map !== null)
+      const maps = stored.maps.map(sanitizeDoc).filter((map): map is AnyMap => map !== null)
       const active = maps.find((map) => map.id === stored.activeMapId) ?? maps[0]
       return { maps, activeMapId: active?.id ?? null }
     }

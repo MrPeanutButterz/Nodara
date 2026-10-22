@@ -1,9 +1,13 @@
 import { confirmDeleteMap } from '../actions'
-import { mapTitle } from '../model/tree'
+import { KIND_HINT, KIND_LABEL, kindOf, mapTitle, nodeCount } from '../model/doc'
+import type { MapKind } from '../model/types'
 import { MOD } from '../platform'
 import { newMap, openMap, toggleSidebar, useStore } from '../store'
-import { MapIcon, PlusIcon, SidebarIcon, TrashIcon } from './icons'
+import { KindIcon, MapIcon, PlusIcon, SidebarIcon, TrashIcon } from './icons'
 import { Kbd } from './Kbd'
+import { Menu } from './Menu'
+
+const KINDS: MapKind[] = ['mindmap', 'concept', 'flowchart', 'timeline']
 
 export function Sidebar() {
   const maps = useStore((s) => s.workspace.maps)
@@ -29,11 +33,24 @@ export function Sidebar() {
       </div>
 
       <div className="sidebar-body">
-        <button className="side-action" onClick={newMap}>
-          <PlusIcon />
-          <span>New map</span>
-          <Kbd keys={[MOD, 'N']} />
-        </button>
+        <Menu
+          label="New map"
+          buttonClassName="side-action"
+          trigger={
+            <>
+              <PlusIcon />
+              <span>New map</span>
+              <Kbd keys={[MOD, 'N']} />
+            </>
+          }
+          items={KINDS.map((kind) => ({
+            id: kind,
+            label: KIND_LABEL[kind],
+            description: KIND_HINT[kind],
+            icon: <KindIcon kind={kind} />,
+            onSelect: () => newMap(kind),
+          }))}
+        />
 
         <nav aria-label="Maps">
           <div className="side-label">Maps</div>
@@ -45,10 +62,10 @@ export function Sidebar() {
                   onClick={() => openMap(map.id)}
                   aria-current={map.id === activeId ? 'page' : undefined}
                 >
-                  <MapIcon />
+                  <KindIcon kind={kindOf(map)} />
                   <span className="map-title">{mapTitle(map)}</span>
                   <span className="map-count" title="Ideas in this map">
-                    {Object.keys(map.nodes).length}
+                    {nodeCount(map)}
                   </span>
                 </button>
                 <button

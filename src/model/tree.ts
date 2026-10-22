@@ -1,4 +1,4 @@
-import type { Direction, DropMode, MapNode, MindMap } from './types'
+import type { DropMode, MapNode, MindMap, TreeLayout } from './types'
 
 // Every function here is pure: it returns a new map and never mutates its input.
 // That keeps undo/redo trivial (a history of snapshots) and makes the logic testable.
@@ -10,8 +10,11 @@ const MAX_TEXT = 500
 const own = (object: object, key: string): boolean => Object.prototype.hasOwnProperty.call(object, key)
 
 export function newId(taken: Record<string, unknown>): string {
-  let id = globalThis.crypto.randomUUID().slice(0, 8)
-  while (own(taken, id)) id = globalThis.crypto.randomUUID().slice(0, 8)
+  // Starts with a letter: an all-digit key would be sorted ahead of the others by JavaScript objects,
+  // which would scramble the order ideas were created in.
+  const make = (): string => `n${globalThis.crypto.randomUUID().slice(0, 7)}`
+  let id = make()
+  while (own(taken, id)) id = make()
   return id
 }
 
@@ -19,18 +22,24 @@ function touch(map: MindMap, nodes: Record<string, MapNode>): MindMap {
   return { ...map, nodes, updatedAt: Date.now() }
 }
 
-export function createMap(rootText: string = ROOT_TEXT): MindMap {
+export const TREE_LAYOUTS: TreeLayout[] = ['right', 'both', 'down', 'radial', 'timeline']
+export const isTreeLayout = (value: unknown): value is TreeLayout =>
+  typeof value === 'string' && (TREE_LAYOUTS as string[]).includes(value)
+
+export function createMap(rootText: string = ROOT_TEXT, layout: TreeLayout = 'right'): MindMap {
   const rootId = newId({})
   return {
+    kind: 'tree',
     id: newId({}),
+    layout,
     rootId,
     updatedAt: Date.now(),
     nodes: { [rootId]: { id: rootId, text: rootText, parentId: null, children: [], collapsed: false } },
   }
 }
 
-export function mapTitle(map: MindMap): string {
-  return map.nodes[map.rootId]?.text.trim() || 'Untitled map'
+export function setLayout(map: MindMap, layout: TreeLayout): MindMap {
+  return map.layout === layout ? map : { ...map, layout, updatedAt: Date.now() }
 }
 
 export function addChild(map: MindMap, parentId: string, text = ''): { map: MindMap; id: string } {
@@ -183,33 +192,20 @@ export function reorderNode(map: MindMap, id: string, delta: -1 | 1): MindMap {
   return touch(map, { ...map.nodes, [parent.id]: { ...parent, children } })
 }
 
-/** Visible nodes grouped by depth, in top-to-bottom order. */
-function visibleByDepth(map: MindMap): string[][] {
-  const levels: string[][] = []
-  const walk = (id: string, depth: number): void => {
-    const node = map.nodes[id]
-    if (!node) return
-    ;(levels[depth] ??= []).push(id)
-    if (!node.collapsed) for (const child of node.children) walk(child, depth + 1)
-  }
-  walk(map.rootId, 0)
-  return levels
-}
-
-/** The node the arrow key should select next. Up and down stay on the same level. */
-export function navigate(map: MindMap, id: string, direction: Direction): string {
+/** The ideas an arrow key should prefer to land on: parent, neighbouring siblings and visible children. */
+export function treeRelatives(map: MindMap, id: string): string[] {
   const node = map.nodes[id]
-  if (!node) return id
-  if (direction === 'left') return node.parentId ?? id
-  if (direction === 'right') return !node.collapsed && node.children.length ? node.children[0] : id
-
-  const levels = visibleByDepth(map)
-  for (const level of levels) {
-    const at = level.indexOf(id)
-    if (at < 0) continue
-    return level[at + (direction === 'up' ? -1 : 1)] ?? id
+  if (!node) return []
+  const out: string[] = []
+  if (node.parentId !== null) {
+    out.push(node.parentId)
+    const siblings = map.nodes[node.parentId].children
+    const at = siblings.indexOf(id)
+    if (at > 0) out.push(siblings[at - 1])
+    if (at >= 0 && at < siblings.length - 1) out.push(siblings[at + 1])
   }
-  return id
+  if (!node.collapsed) out.push(...node.children)
+  return out
 }
 
 /** An indented outline of the whole map, collapsed branches included. */
@@ -264,7 +260,9 @@ export function sanitizeMap(raw: unknown): MindMap | null {
   }
 
   return {
+    kind: 'tree',
     id: typeof raw.id === 'string' && raw.id !== '__proto__' ? raw.id : newId({}),
+    layout: isTreeLayout(raw.layout) ? raw.layout : 'right',
     rootId,
     nodes,
     updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : Date.now(),
