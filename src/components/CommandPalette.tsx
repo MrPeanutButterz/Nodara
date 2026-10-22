@@ -26,13 +26,15 @@ import {
   toggleSidebar,
   undo,
 } from '../store'
-import { KindIcon } from './icons'
+import { ChevronIcon, KindIcon } from './icons'
 import { Kbd } from './Kbd'
 
 interface Command {
   id: string
   title: string
-  group: 'Actions' | 'Maps'
+  group: 'Actions' | 'Maps' | 'New map'
+  /** Opens a second step in the palette instead of running right away. */
+  opensKinds?: boolean
   keys?: string[]
   kind?: MapKind
   run: () => void
@@ -44,13 +46,9 @@ const NEW_KINDS: MapKind[] = ['mindmap', 'concept', 'flowchart', 'timeline']
 function buildCommands(): Command[] {
   const state = getState()
   const doc = selectActiveDoc(state)
-  const commands: Command[] = NEW_KINDS.map((kind) => ({
-    id: `new-${kind}`,
-    title: `New ${KIND_LABEL[kind].toLowerCase()}`,
-    group: 'Actions' as const,
-    keys: kind === 'mindmap' ? [MOD, 'N'] : undefined,
-    run: () => newMap(kind),
-  }))
+  const commands: Command[] = [
+    { id: 'new-map', title: 'New map', group: 'Actions', opensKinds: true, run: () => undefined },
+  ]
 
   if (doc) {
     const isGraph = doc.kind === 'graph'
@@ -126,22 +124,36 @@ function buildCommands(): Command[] {
   return commands
 }
 
+/** The second step after "New map": one row per kind of map. */
+const KIND_COMMANDS: Command[] = NEW_KINDS.map((kind) => ({
+  id: `new-${kind}`,
+  title: KIND_LABEL[kind],
+  group: 'New map' as const,
+  kind,
+  keys: kind === 'mindmap' ? [MOD, 'N'] : undefined,
+  run: () => newMap(kind),
+}))
+
 export function CommandPalette() {
   const commands = useMemo(buildCommands, [])
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState(0)
+  const [choosingKind, setChoosingKind] = useState(false)
   const listRef = useRef<HTMLUListElement>(null)
 
   const results = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean)
-    const matches = commands.filter((command) => {
+    // Typing in the main list still finds "New flowchart" and the like directly.
+    const direct = KIND_COMMANDS.map((c) => ({ ...c, title: `New ${c.title.toLowerCase()}`, group: 'Actions' as const, keys: undefined }))
+    const pool = choosingKind ? KIND_COMMANDS : words.length > 0 ? [...commands, ...direct] : commands
+    const matches = pool.filter((command) => {
       const title = command.title.toLowerCase()
       return words.every((word) => title.includes(word))
     })
     if (words.length > 0) return matches
     // With no query, list every action but only a few maps; the rest are one search away.
     return [...matches.filter((c) => c.group === 'Actions'), ...matches.filter((c) => c.group === 'Maps').slice(0, 6)]
-  }, [commands, query])
+  }, [commands, query, choosingKind])
 
   const active = Math.min(index, Math.max(0, results.length - 1))
 
@@ -151,6 +163,12 @@ export function CommandPalette() {
 
   const run = (command: Command | undefined): void => {
     if (!command) return
+    if (command.opensKinds) {
+      setChoosingKind(true)
+      setQuery('')
+      setIndex(0)
+      return
+    }
     setPalette(false)
     command.run()
   }
@@ -167,7 +185,7 @@ export function CommandPalette() {
           className="palette-input"
           autoFocus
           value={query}
-          placeholder="Type a command or search maps"
+          placeholder={choosingKind ? 'Choose a kind of map' : 'Type a command or search maps'}
           spellCheck={false}
           role="combobox"
           aria-expanded="true"
@@ -188,9 +206,14 @@ export function CommandPalette() {
             } else if (e.key === 'Enter') {
               e.preventDefault()
               run(results[active])
-            } else if (e.key === 'Escape') {
+            } else if (e.key === 'Escape' || (e.key === 'Backspace' && choosingKind && query === '')) {
               e.preventDefault()
-              setPalette(false)
+              // From the list of kinds, one step back; from anywhere else, close.
+              if (choosingKind) {
+                setChoosingKind(false)
+                setQuery('')
+                setIndex(0)
+              } else setPalette(false)
             } else if (e.key === 'Tab') {
               e.preventDefault()
             }
@@ -213,9 +236,10 @@ export function CommandPalette() {
                   onPointerMove={() => setIndex(i)}
                   onClick={() => run(command)}
                 >
-                  {command.group === 'Maps' && <KindIcon kind={command.kind ?? 'mindmap'} />}
+                  {command.kind && <KindIcon kind={command.kind} />}
                   <span className="palette-title">{command.title}</span>
                   {command.keys && <Kbd keys={command.keys} />}
+                  {command.opensKinds && <ChevronIcon />}
                 </div>
               </li>
             ))}
