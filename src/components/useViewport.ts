@@ -20,23 +20,36 @@ export const clamp = (value: number, low: number, high: number): number => Math.
  */
 export function useViewport(boundsRef: { current: Bounds }, startRef?: { current: Bounds | undefined }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 })
+  const [view, setRawView] = useState<View>({ x: 0, y: 0, k: 1 })
   const viewRef = useRef(view)
   viewRef.current = view
+  // Until the person pans, zooms or fits, the opening view follows the size of the canvas: the window
+  // may still be settling to its final size when a map first appears.
+  const pinned = useRef(false)
+  const setView = useCallback((next: View) => {
+    pinned.current = true
+    setRawView(next)
+  }, [])
 
-  const fit = useCallback(() => {
+  const placeFit = useCallback(() => {
     const el = containerRef.current
     if (!el) return
     const { width, height } = el.getBoundingClientRect()
     const bounds = boundsRef.current
     const pad = 96
     const k = clamp(Math.min((width - pad * 2) / bounds.w, (height - pad * 2) / bounds.h), MIN_ZOOM, 1)
-    setView({
+    setRawView({
       k,
       x: width / 2 - (bounds.x + bounds.w / 2) * k,
       y: height / 2 - (bounds.y + bounds.h / 2) * k,
     })
   }, [boundsRef])
+
+  /** "Fit to screen", asked for by the person. */
+  const fit = useCallback(() => {
+    pinned.current = true
+    placeFit()
+  }, [placeFit])
 
   const zoomAt = useCallback((factor: number, cx: number, cy: number) => {
     const v = viewRef.current
@@ -86,14 +99,28 @@ export function useViewport(boundsRef: { current: Bounds }, startRef?: { current
     const el = containerRef.current
     if (!el) return
     const { width, height } = el.getBoundingClientRect()
-    setView({ k: 1, x: width / 2 - (box.x + box.w / 2), y: height / 2 - (box.y + box.h / 2) })
+    setRawView({ k: 1, x: width / 2 - (box.x + box.w / 2), y: height / 2 - (box.y + box.h / 2) })
   }, [])
 
-  useLayoutEffect(() => {
+  const placeStart = useCallback(() => {
     const start = startRef?.current
     if (start) centerOn(start)
-    else fit()
-  }, [fit, centerOn, startRef])
+    else placeFit()
+  }, [startRef, centerOn, placeFit])
+
+  useLayoutEffect(() => {
+    placeStart()
+  }, [placeStart])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      if (!pinned.current) placeStart()
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [placeStart])
 
   useEffect(() => {
     window.addEventListener(FIT_EVENT, fit)
