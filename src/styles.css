@@ -943,3 +943,24 @@ kbd {
   text-align: center;
   user-select: text;
 }
+
+/* A menu that opens in the page, like the rows of the map list. */
+.menu.inline {
+  position: static;
+  min-width: 0;
+  margin: 2px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.menu.inline .menu-item {
+  height: 30px;
+  padding: 0 8px 0 16px;
+  gap: 8px;
+}
+.menu.inline .menu-label {
+  color: var(--text-2);
+  font-weight: 400;
+}

@@ -18,10 +18,12 @@ interface MenuProps {
   /** Names the menu for screen readers and the tooltip. */
   label: string
   items: MenuItem[]
+  /** Opens in the page, pushing what is below it down, as compact rows. */
+  inline?: boolean
 }
 
 /** A button that opens a short list of choices. Arrow keys move, Enter picks, Escape closes. */
-export function Menu({ trigger, buttonClassName, label, items }: MenuProps) {
+export function Menu({ trigger, buttonClassName, label, items, inline = false }: MenuProps) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -65,12 +67,13 @@ export function Menu({ trigger, buttonClassName, label, items }: MenuProps) {
         {trigger}
       </button>
       {open && (
-        <div className="menu" role="menu" aria-label={label} ref={listRef} onKeyDown={move}>
+        <div className={inline ? 'menu inline' : 'menu'} role="menu" aria-label={label} ref={listRef} onKeyDown={move}>
           {items.map((item) => (
             <button
               key={item.id}
               className="menu-item"
               role="menuitem"
+              title={inline ? item.description : undefined}
               onClick={() => {
                 setOpen(false)
                 item.onSelect()
@@ -79,7 +82,7 @@ export function Menu({ trigger, buttonClassName, label, items }: MenuProps) {
               {item.icon && <span className="menu-icon">{item.icon}</span>}
               <span className="menu-text">
                 <span className="menu-label">{item.label}</span>
-                {item.description && <span className="menu-desc">{item.description}</span>}
+                {!inline && item.description && <span className="menu-desc">{item.description}</span>}
               </span>
               {item.checked && (
                 <span className="menu-check">

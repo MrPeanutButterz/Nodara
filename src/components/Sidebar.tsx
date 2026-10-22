@@ -35,6 +35,7 @@ export function Sidebar() {
       <div className="sidebar-body">
         <Menu
           label="New map"
+          inline
           buttonClassName="side-action"
           trigger={
             <>
