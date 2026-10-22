@@ -29,12 +29,16 @@ import {
 import { ChevronIcon, KindIcon } from './icons'
 import { Kbd } from './Kbd'
 
+type Step = 'kind' | 'layout'
+
 interface Command {
   id: string
   title: string
-  group: 'Actions' | 'Maps' | 'New map'
+  group: 'Actions' | 'Maps' | 'New map' | 'Layout'
   /** Opens a second step in the palette instead of running right away. */
-  opensKinds?: boolean
+  opensStep?: Step
+  /** Only listed in that second step (and found by typing in the main list). */
+  inStep?: Step
   keys?: string[]
   kind?: MapKind
   run: () => void
@@ -47,7 +51,7 @@ function buildCommands(): Command[] {
   const state = getState()
   const doc = selectActiveDoc(state)
   const commands: Command[] = [
-    { id: 'new-map', title: 'New map', group: 'Actions', opensKinds: true, run: () => undefined },
+    { id: 'new-map', title: 'New map', group: 'Actions', opensStep: 'kind', run: () => undefined },
   ]
 
   if (doc) {
@@ -71,9 +75,16 @@ function buildCommands(): Command[] {
       },
     )
     if (doc.kind === 'tree') {
+      commands.push({ id: 'layout', title: 'Layout', group: 'Actions', opensStep: 'layout', run: () => undefined })
       for (const layout of TREE_LAYOUTS) {
         if (layout === doc.layout) continue
-        commands.push({ id: `layout-${layout}`, title: `Layout: ${LAYOUT_LABEL[layout]}`, group: 'Actions', run: () => setTreeLayout(layout) })
+        commands.push({
+          id: `layout-${layout}`,
+          title: `Layout: ${LAYOUT_LABEL[layout]}`,
+          group: 'Layout',
+          inStep: 'layout',
+          run: () => setTreeLayout(layout),
+        })
       }
     }
     if (selected) {
@@ -126,6 +137,7 @@ function buildCommands(): Command[] {
 
 /** The second step after "New map": one row per kind of map. */
 const KIND_COMMANDS: Command[] = NEW_KINDS.map((kind) => ({
+  inStep: 'kind' as const,
   id: `new-${kind}`,
   title: KIND_LABEL[kind],
   group: 'New map' as const,
@@ -138,22 +150,28 @@ export function CommandPalette() {
   const commands = useMemo(buildCommands, [])
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState(0)
-  const [choosingKind, setChoosingKind] = useState(false)
+  const [step, setStep] = useState<Step | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
   const results = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean)
     // Typing in the main list still finds "New flowchart" and the like directly.
     const direct = KIND_COMMANDS.map((c) => ({ ...c, title: `New ${c.title.toLowerCase()}`, group: 'Actions' as const, keys: undefined }))
-    const pool = choosingKind ? KIND_COMMANDS : words.length > 0 ? [...commands, ...direct] : commands
+    const pool = step
+      ? step === 'kind'
+        ? KIND_COMMANDS
+        : commands.filter((c) => c.inStep === step)
+      : words.length > 0
+        ? [...commands, ...direct]
+        : commands
     const matches = pool.filter((command) => {
       const title = command.title.toLowerCase()
       return words.every((word) => title.includes(word))
     })
-    if (words.length > 0 || choosingKind) return matches
+    if (words.length > 0 || step) return matches
     // With no query, list every action but only a few maps; the rest are one search away.
     return [...matches.filter((c) => c.group === 'Actions'), ...matches.filter((c) => c.group === 'Maps').slice(0, 6)]
-  }, [commands, query, choosingKind])
+  }, [commands, query, step])
 
   const active = Math.min(index, Math.max(0, results.length - 1))
 
@@ -163,8 +181,8 @@ export function CommandPalette() {
 
   const run = (command: Command | undefined): void => {
     if (!command) return
-    if (command.opensKinds) {
-      setChoosingKind(true)
+    if (command.opensStep) {
+      setStep(command.opensStep)
       setQuery('')
       setIndex(0)
       return
@@ -185,7 +203,7 @@ export function CommandPalette() {
           className="palette-input"
           autoFocus
           value={query}
-          placeholder={choosingKind ? 'Choose a kind of map' : 'Type a command or search maps'}
+          placeholder={step === 'kind' ? 'Choose a kind of map' : step === 'layout' ? 'Choose a layout' : 'Type a command or search maps'}
           spellCheck={false}
           role="combobox"
           aria-expanded="true"
@@ -206,11 +224,11 @@ export function CommandPalette() {
             } else if (e.key === 'Enter') {
               e.preventDefault()
               run(results[active])
-            } else if (e.key === 'Escape' || (e.key === 'Backspace' && choosingKind && query === '')) {
+            } else if (e.key === 'Escape' || (e.key === 'Backspace' && step && query === '')) {
               e.preventDefault()
               // From the list of kinds, one step back; from anywhere else, close.
-              if (choosingKind) {
-                setChoosingKind(false)
+              if (step) {
+                setStep(null)
                 setQuery('')
                 setIndex(0)
               } else setPalette(false)
@@ -237,9 +255,9 @@ export function CommandPalette() {
                   onClick={() => run(command)}
                 >
                   {command.kind && <KindIcon kind={command.kind} />}
-                  <span className="palette-title">{command.title}</span>
+                  <span className="palette-title">{step === 'layout' ? command.title.replace(/^Layout: /, '') : command.title}</span>
                   {command.keys && <Kbd keys={command.keys} />}
-                  {command.opensKinds && <ChevronIcon />}
+                  {command.opensStep && <ChevronIcon />}
                 </div>
               </li>
             ))}
