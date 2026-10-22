@@ -150,7 +150,7 @@ export function CommandPalette() {
       const title = command.title.toLowerCase()
       return words.every((word) => title.includes(word))
     })
-    if (words.length > 0) return matches
+    if (words.length > 0 || choosingKind) return matches
     // With no query, list every action but only a few maps; the rest are one search away.
     return [...matches.filter((c) => c.group === 'Actions'), ...matches.filter((c) => c.group === 'Maps').slice(0, 6)]
   }, [commands, query, choosingKind])
