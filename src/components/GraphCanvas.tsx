@@ -27,6 +27,8 @@ type Gesture =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number; moved: boolean; background: boolean }
   | { kind: 'move'; id: string; sx: number; sy: number; offX: number; offY: number; active: boolean }
   | { kind: 'link'; from: string; sx: number; sy: number; active: boolean }
+  /** Runs on release. Starting an edit on press would lose focus again when the press finishes. */
+  | { kind: 'action'; run: () => void }
 
 /** What is being dragged right now, kept in state so the canvas redraws while the pointer moves. */
 type Live =
@@ -110,7 +112,7 @@ export function GraphCanvas({ map }: { map: GraphMap }) {
       const id = nodeEl.dataset.nodeId as string
       selectNode(id)
       if (isDoubleTap(`node:${id}`, e.clientX, e.clientY)) {
-        startEdit(id)
+        gesture.current = { kind: 'action', run: () => startEdit(id) }
         return
       }
       const idea = map.nodes[id]
@@ -132,7 +134,7 @@ export function GraphCanvas({ map }: { map: GraphMap }) {
     if (linkEl) {
       const id = linkEl.dataset.linkId as string
       selectLink(id)
-      if (isDoubleTap(`link:${id}`, e.clientX, e.clientY)) startEditLink(id)
+      if (isDoubleTap(`link:${id}`, e.clientX, e.clientY)) gesture.current = { kind: 'action', run: () => startEditLink(id) }
       return
     }
 
@@ -141,7 +143,7 @@ export function GraphCanvas({ map }: { map: GraphMap }) {
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>): void => {
     const g = gesture.current
-    if (!g) return
+    if (!g || g.kind === 'action') return
     if (g.kind === 'pan') {
       const dx = e.clientX - g.sx
       const dy = e.clientY - g.sy
@@ -170,6 +172,10 @@ export function GraphCanvas({ map }: { map: GraphMap }) {
     setLive(null)
     if (!g || cancelled) return
 
+    if (g.kind === 'action') {
+      g.run()
+      return
+    }
     if (g.kind === 'pan' && !g.moved && g.background) {
       selectNode(null)
       const at = toWorld(e.clientX, e.clientY)

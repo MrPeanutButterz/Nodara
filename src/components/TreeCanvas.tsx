@@ -27,6 +27,8 @@ interface DragInfo {
 type Gesture =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number; moved: boolean; deselect: boolean }
   | { kind: 'node'; id: string; sx: number; sy: number; active: boolean }
+  /** Runs on release. Starting an edit on press would lose focus again when the press finishes. */
+  | { kind: 'action'; run: () => void }
 
 const DRAG_THRESHOLD = 5
 const DOUBLE_CLICK_MS = 350
@@ -93,11 +95,11 @@ export function TreeCanvas({ map }: { map: MindMap }) {
 
     const id = nodeEl.dataset.nodeId as string
     if (target.closest('[data-collapse]')) {
-      toggleCollapse(id)
+      gesture.current = { kind: 'action', run: () => toggleCollapse(id) }
       return
     }
     if (target.closest('[data-add]')) {
-      addChildToSelected()
+      gesture.current = { kind: 'action', run: addChildToSelected }
       return
     }
 
@@ -106,7 +108,7 @@ export function TreeCanvas({ map }: { map: MindMap }) {
     const last = lastTap.current
     if (last && last.id === id && now - last.time < DOUBLE_CLICK_MS) {
       lastTap.current = null
-      startEdit(id)
+      gesture.current = { kind: 'action', run: () => startEdit(id) }
       return
     }
     lastTap.current = { id, time: now }
@@ -121,7 +123,7 @@ export function TreeCanvas({ map }: { map: MindMap }) {
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>): void => {
     const g = gesture.current
-    if (!g) return
+    if (!g || g.kind === 'action') return
     if (g.kind === 'pan') {
       const dx = e.clientX - g.sx
       const dy = e.clientY - g.sy
@@ -148,6 +150,10 @@ export function TreeCanvas({ map }: { map: MindMap }) {
     setDrag(null)
     if (!g || cancelled) return
 
+    if (g.kind === 'action') {
+      g.run()
+      return
+    }
     if (g.kind === 'pan' && !g.moved && g.deselect) selectNode(null)
     if (g.kind === 'node' && g.active && dropped) {
       const placement = dropPlacement(map, g.id, dropped.id, dropped.mode)
