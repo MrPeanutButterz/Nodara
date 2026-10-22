@@ -1,6 +1,6 @@
-# Radix
+# Nodara
 
-Every idea has a root. Radix is a mind-mapping app that helps you start from
+Every idea has a root. Nodara is a mind-mapping app that helps you start from
 that root and grow your thinking into a clear, structured map.
 
 ## Features
