@@ -15,9 +15,10 @@ export const clamp = (value: number, low: number, high: number): number => Math.
 
 /**
  * Panning and zooming shared by every kind of map. `boundsRef` points at the box around everything
- * on the canvas, so "fit" always sees the latest layout.
+ * on the canvas, so "fit" always sees the latest layout. With `startRef`, a new map opens centred on
+ * that box at normal size instead of fitted to everything.
  */
-export function useViewport(boundsRef: { current: Bounds }) {
+export function useViewport(boundsRef: { current: Bounds }, startRef?: { current: Bounds | undefined }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 })
   const viewRef = useRef(view)
@@ -81,9 +82,18 @@ export function useViewport(boundsRef: { current: Bounds }) {
     if (dx || dy) setView({ ...v, x: v.x + dx, y: v.y + dy })
   }, [])
 
+  const centerOn = useCallback((box: Bounds) => {
+    const el = containerRef.current
+    if (!el) return
+    const { width, height } = el.getBoundingClientRect()
+    setView({ k: 1, x: width / 2 - (box.x + box.w / 2), y: height / 2 - (box.y + box.h / 2) })
+  }, [])
+
   useLayoutEffect(() => {
-    fit()
-  }, [fit])
+    const start = startRef?.current
+    if (start) centerOn(start)
+    else fit()
+  }, [fit, centerOn, startRef])
 
   useEffect(() => {
     window.addEventListener(FIT_EVENT, fit)

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { handleSide, layoutMap } from '../model/layout'
+import type { Bounds } from '../model/layout'
 import { dropPlacement } from '../model/tree'
 import type { DropMode, MindMap } from '../model/types'
 import { MOD } from '../platform'
@@ -49,7 +50,11 @@ export function TreeCanvas({ map }: { map: MindMap }) {
   const boundsRef = useRef(layout.bounds)
   boundsRef.current = layout.bounds
 
-  const viewport = useViewport(boundsRef)
+  // A map opens with its root idea in the middle of the screen.
+  const startRef = useRef<Bounds | undefined>(undefined)
+  startRef.current = layout.byId[map.rootId]
+
+  const viewport = useViewport(boundsRef, startRef)
   const { containerRef, viewRef, setView, reveal } = viewport
 
   const [drag, setDrag] = useState<DragInfo | null>(null)
